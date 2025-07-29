@@ -2,8 +2,9 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import Backend from "i18next-http-backend";
 import LanguageDetector from "i18next-browser-languagedetector";
+import type { ZodBuiltInLocale } from "./util/useSetupLocale";
 
-export const AVAILABLE_LOCALES = ["en"];
+export const AVAILABLE_LOCALES:  ZodBuiltInLocale[] = ["en"];
 export const DEFAULT_LOCALE = "en";
 export const initI18n = (locale = DEFAULT_LOCALE) =>
   i18n
@@ -26,7 +27,7 @@ export const initI18n = (locale = DEFAULT_LOCALE) =>
       //     },
       //   },
       // },
-      ns: ["translation", "zod"],
+      ns: ["translation", "zodv3_old_map"],
       defaultNS: "translation",
     });
 
