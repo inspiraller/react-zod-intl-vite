@@ -1,28 +1,29 @@
-import React, { Suspense, useState, useEffect } from "react";
-import { z } from "zod";
-import { makeZodI18nMap } from "zod-i18n-map";
-import { initI18n } from "./i18n";
-import App from "./App";
+import React, { useState, useEffect, Suspense } from "react";
+import { useSetupLocale, type ZodBuiltInLocale } from "./util/useSetupLocale";
 import { Loader } from "./components/Loader";
+import App from "./App";
+import { initI18n } from "./i18n";
 
 export const Root = () => {
-  const [i18nReady, setI18nReady] = useState(false);
+  const [isI18nReady, setisI18nReady] = useState<boolean>(false);
 
   useEffect(() => {
-    const userLang = navigator.language.split("-")[0] || "en";
+    // Set up global Zod locale with translations from next-intl
+
+    const userLang = (navigator.language.split("-")[0] ||
+      "en") as ZodBuiltInLocale;
     initI18n(userLang).then(() => {
-      // Test:
-      // const t = (key: string, options?: any) =>
-      //   i18n.t(key, { ns: "zod", ...options });
-      // console.log("errors.invalid_type=", t("errors.invalid_type"));
-      //z.setErrorMap(makeZodI18nMap({ t: t as unknown as TFunction }));
 
-      z.setErrorMap(makeZodI18nMap());
-      setI18nReady(true);
+ 
+      setisI18nReady(true);
+
     });
-  }, []);
+  });
 
-  if (!i18nReady) {
+  //setupLocale(userLang);
+  useSetupLocale({locale: "en", isReady: isI18nReady});
+
+  if (!isI18nReady) {
     return <Loader />;
   }
 
