@@ -1,9 +1,9 @@
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+
 import z from "zod";
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
-// import type { PropsFormExample } from '@/@types';
+import { zodResolver } from "@/zod/zodResolver";
 
 export const FormExample = () => {
   const schema = z.object({
