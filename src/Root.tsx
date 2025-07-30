@@ -1,27 +1,21 @@
 import React, { useState, useEffect, Suspense } from "react";
-import { useSetupLocale, type ZodBuiltInLocale } from "./util/useSetupLocale";
+
 import { Loader } from "./components/Loader";
 import App from "./App";
 import { initI18n } from "./i18n";
+import type { zodLocale } from "./@types";
+import { ZodSetup } from "./zod/ZodSetup";
 
 export const Root = () => {
   const [isI18nReady, setisI18nReady] = useState<boolean>(false);
-
+  const locale = (navigator.language.split("-")[0] || "en") as zodLocale;
   useEffect(() => {
     // Set up global Zod locale with translations from next-intl
 
-    const userLang = (navigator.language.split("-")[0] ||
-      "en") as ZodBuiltInLocale;
-    initI18n(userLang).then(() => {
-
- 
+    initI18n(locale).then(() => {
       setisI18nReady(true);
-
     });
   });
-
-  //setupLocale(userLang);
-  useSetupLocale({locale: "en", isReady: isI18nReady});
 
   if (!isI18nReady) {
     return <Loader />;
@@ -30,7 +24,9 @@ export const Root = () => {
   return (
     <React.StrictMode>
       <Suspense fallback={<Loader />}>
-        <App />
+        <ZodSetup locale={locale}>
+          <App />
+        </ZodSetup>
       </Suspense>
     </React.StrictMode>
   );
