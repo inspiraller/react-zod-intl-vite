@@ -8,11 +8,12 @@ my-app/
 │  ├─ locales/
 │  │  ├─ en/
 │  │  │  └─ translation.json
-│  │  │  └─ zod.json
+│  │  │  └─ zodv4.js // <-- This is a direct copy from zod node_modules folder with some tweaks to load as a template and overriden text.
 ├─ src/
+│  ├─ App.tsx
 │  ├─ i18n.ts
 │  ├─ main.tsx
-│  ├─ App.tsx
+│  ├─ Root.tsx
 │  └─ components/
        └─ FormExample.tsx
 ```
@@ -22,80 +23,194 @@ my-app/
     loadPath: "/locales/{{lng}}/{{ns}}.json", // path to load translations
   },
 ```
-OR
-```json
-  resources: {
-    en: {
-      zod: {
-        errors: {}
-      },
-    },
-  },
-```
 
-## public/locales/en/translation.json
-Example. See local file for complete json.
-```json
-{
-  "errors": {
-    ...,
-    "invalid_type": "OVERRIDE Expected {expected}, received {received}",
-    "too_small": {
-      "string": {
-        "inclusive": "OVERRIDE String must contain at least {minimum} character(s)",
-        "inclusive_one": "String must contain at least {minimum} character",
-        "inclusive_other": "String must contain at least {minimum} characters",
-        "inclusive_with_path": "{path} OVERRIDE1 must contain at least {minimum} character(s)",
-        "inclusive_with_path_one": "{path} OVERRIDE2 must contain at least {minimum} character",
-        "inclusive_with_path_other": "{path} OVERRIDE3 must contain at least {minimum} characters",
-        "not_inclusive": "String must contain over {minimum} character(s)",
-        "not_inclusive_one": "String must contain over {minimum} character",
-        "not_inclusive_other": "String must contain over {minimum} characters",
-        "not_inclusive_with_path": "{path} OVERRIDE4 must contain over {minimum} character(s)",
-        "not_inclusive_with_path_one": "{path} OVERRIDE5 must contain over {minimum} character",
-        "not_inclusive_with_path_other": "{path} OVERRIDE6 must contain over {minimum} characters"
-      }
-    },
-  }
-}
+## public/locales/en/zodv4.js
+Extracted from node_modules/zod locales folder.
+- Replaced imports with util methods.
+```js
+const util = {
+  stringifyPrimitive: (value) => {
+    if (typeof value === "bigint") return value.toString() + "n";
+    if (typeof value === "string") return `"${value}"`;
+    return `${value}`;
+  },
+  joinValues: (array, separator = "|") => {
+    return array.map((val) => stringifyPrimitive(val)).join(separator);
+  },
+};
+// extract
+// case "too_small": {
+//   const adj = issue.inclusive ? ">=" : ">";
+//   const sizing = getSizing(issue.origin);
+//   if (sizing) {
+//     return `Too small: expected OVERRIDE ${
+//       issue.origin
+//     } to have ${adj}${issue.minimum.toString()} ${sizing.unit}`;
+//   }
+//   return `Too small: expected OVERIDDE !!! ${
+//     issue.origin
+//   } to be ${adj}${issue.minimum.toString()}`;
+// }
 ```
 
 ## Root.tsx
 ```tsx
-import React, { Suspense, useState, useEffect } from "react";
-import { z } from "zod";
-import { makeZodI18nMap } from "zod-i18n-map";
-import { initI18n } from "./i18n";
-import App from "./App";
+import React, { useState, useEffect, Suspense } from "react";
+
 import { Loader } from "./components/Loader";
+import App from "./App";
+import { initI18n } from "./i18n";
+import type { zodLocale } from "./@types";
+import { ZodSetup } from "./zod/ZodSetup";
 
 export const Root = () => {
-  const [i18nReady, setI18nReady] = useState(false);
-
+  const [isI18nReady, setisI18nReady] = useState<boolean>(false);
+  const locale = (navigator.language.split("-")[0] || "en") as zodLocale;
   useEffect(() => {
-    const userLang = navigator.language.split("-")[0] || "en";
-    initI18n(userLang).then(() => {
-      // Test:
-      // const t = (key: string, options?: any) =>
-      //   i18n.t(key, { ns: "zod", ...options });
-      // console.log("errors.invalid_type=", t("errors.invalid_type"));
-      //z.setErrorMap(makeZodI18nMap({ t: t as unknown as TFunction }));
+    // Set up global Zod locale with translations from next-intl
 
-      z.setErrorMap(makeZodI18nMap());
-      setI18nReady(true);
+    initI18n(locale).then(() => {
+      setisI18nReady(true);
     });
-  }, []);
+  });
 
-  if (!i18nReady) {
+  if (!isI18nReady) {
     return <Loader />;
   }
 
   return (
     <React.StrictMode>
       <Suspense fallback={<Loader />}>
-        <App />
+        <ZodSetup locale={locale}>
+          <App />
+        </ZodSetup>
       </Suspense>
     </React.StrictMode>
+  );
+};
+```
+
+## ZodSetup.tsx
+```tsx
+// Custom error map function for global translations
+
+import z, { locales } from "zod";
+import { useEffect } from "react";
+import type { zodLocale } from "@/@types";
+import { useCustomZodLocale } from "./useCustomZodLocale";
+
+interface Props {
+  locale: zodLocale;
+  children: React.ReactNode;
+}
+export const ZodSetup = ({ locale, children }: Props) => {
+  // OPTION 1: Use for internal zod languages
+  // useEffect(() => {
+  //   const localeError = locales[locale]().localeError;
+  //   z.config({ localeError: localeError });
+  // }, [locale]);
+
+  // OPTION 2: Use for dynamic custom languages
+  useCustomZodLocale({ locale });
+
+  return children;
+};
+```
+
+## useCustomZodLocale.tsx
+```tsx
+// Custom error map function for global translations
+
+import z, { locales } from "zod";
+import { useEffect } from "react";
+import type { zodLocale } from "@/@types";
+
+type fnErrorMap = z.core.$ZodErrorMap<z.core.$ZodIssue>; // (iss: string, ctx?: any) => { message: string };
+
+type PropWindow = { zodCustomEn: () => { localeError: fnErrorMap } };
+
+interface Props {
+  locale: zodLocale;
+}
+export const useCustomZodLocale = ({ locale }: Props) => {
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "/locales/en/zodv4.js";
+
+    script.onload = () => {
+      const localeError =
+        locale === "en"
+          ? (window as unknown as PropWindow).zodCustomEn().localeError
+          : locales[locale]().localeError;
+      z.config({ localeError: localeError });
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, [locale]);
+};
+```
+
+## FormExample.tsx
+```tsx
+import { useForm } from "react-hook-form";
+
+import z from "zod";
+import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
+import { zodResolver } from "@/zod/zodResolver";
+
+export const FormExample = () => {
+  const schema = z.object({
+    username: z.string().min(3),
+    password: z.string().min(6),
+  });
+
+  type PropsFormExample = z.infer<typeof schema>;
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<PropsFormExample>({
+    resolver: zodResolver(schema),
+    mode: "onBlur",
+  });
+
+  const { t } = useTranslation();
+
+  const tZod = (key: string, options?: any) =>
+    i18n.t(key, { ns: "zodv3_old_map", ...options });
+
+  const onSubmit = (data: PropsFormExample) => {
+    alert(JSON.stringify(data, null, 2));
+
+    console.log("OG text=", t("Generic.submit"));
+    console.log(
+      "tZod('errors.invalid_type', {expected, recieved})=",
+      tZod("errors.invalid_type", {
+        expected: "string",
+        received: "number",
+      })
+    );
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <input {...register("username")} placeholder="Username" />
+      {errors.username && (
+        <p style={{ color: "red" }}>{errors.username.message}</p>
+      )}
+
+      <input type="password" {...register("password")} placeholder="Password" />
+      {errors.password && (
+        <p style={{ color: "red" }}>{errors.password.message}</p>
+      )}
+
+      <button type="submit">Submit</button>
+    </form>
   );
 };
 ```
@@ -105,6 +220,4 @@ export const Root = () => {
 - just press submit to see errors
 
 Expect
-> {path} OVERRIDE3 must contain at least {minimum} characters
-
-Will have used local translation
+> Too small: expected OVERRIDE string to have >=3 characters
