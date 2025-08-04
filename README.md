@@ -13,7 +13,6 @@ my-app/
 │  ├─ App.tsx
 │  ├─ i18n.ts
 │  ├─ main.tsx
-│  ├─ Root.tsx
 │  └─ components/
        └─ FormExample.tsx
 ```
@@ -53,7 +52,7 @@ const util = {
 // }
 ```
 
-## Root.tsx
+## main.tsx
 ```tsx
 import React, { useState, useEffect, Suspense } from "react";
 
@@ -66,13 +65,16 @@ import { ZodSetup } from "./zod/ZodSetup";
 export const Root = () => {
   const [isI18nReady, setisI18nReady] = useState<boolean>(false);
   const locale = (navigator.language.split("-")[0] || "en") as zodLocale;
-  useEffect(() => {
-    // Set up global Zod locale with translations from next-intl
 
-    initI18n(locale).then(() => {
-      setisI18nReady(true);
-    });
-  });
+  useEffect(() => {
+    if (!isI18nReady) {
+      initI18n(locale).then(() => {
+        setisI18nReady(true);
+      });
+    } else {
+      i18n.changeLanguage(locale);
+    }
+  }, [locale, isI18nReady]);
 
   if (!isI18nReady) {
     return <Loader />;
